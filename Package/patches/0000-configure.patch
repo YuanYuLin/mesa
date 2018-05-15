@@ -1,0 +1,10 @@
+--- a/configure	2018-04-18 22:48:02.000000000 +0800
++++ b/configure	2018-05-14 15:30:22.109242117 +0800
+@@ -24899,6 +24899,7 @@
+         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+ $as_echo "yes" >&6; }
+ 	WAYLAND_SCANNER=`$PKG_CONFIG --variable=wayland_scanner wayland-scanner`
++	WAYLAND_SCANNER=${WAYLAND_SCANNER_UTIL}
+ fi
+ if test "x$WAYLAND_SCANNER" = x; then
+     # Extract the first word of "wayland-scanner", so it can be a program name with args.
