@@ -15,6 +15,7 @@ tmp_include_dir = ""
 dst_include_dir = ""
 dst_lib_dir = ""
 dst_usr_local_lib_dir = ""
+PKG_WAYLAND="wayland"
 
 def set_global(args):
     global pkg_path
@@ -28,6 +29,8 @@ def set_global(args):
     global dst_include_dir
     global dst_lib_dir
     global dst_usr_local_lib_dir
+    global src_pkgconfig_dir
+    global dst_pkgconfig_dir
     pkg_path = args["pkg_path"]
     output_dir = args["output_path"]
     tarball_pkg = ops.path_join(pkg_path, TARBALL_FILE)
@@ -40,6 +43,8 @@ def set_global(args):
     dst_include_dir = ops.path_join("include",args["pkg_name"])
     dst_lib_dir = ops.path_join(install_dir, "lib")
     dst_usr_local_lib_dir = ops.path_join(install_dir, "usr/local/lib")
+    src_pkgconfig_dir = ops.path_join(pkg_path, "pkgconfig")
+    dst_pkgconfig_dir = ops.path_join(install_dir, "pkgconfig")
 
 def MAIN_ENV(args):
     set_global(args)
@@ -48,8 +53,8 @@ def MAIN_ENV(args):
     ops.exportEnv(ops.setEnv("CXX", ops.getEnv("CROSS_COMPILE") + "g++"))
     ops.exportEnv(ops.setEnv("CROSS", ops.getEnv("CROSS_COMPILE")))
     ops.exportEnv(ops.setEnv("DESTDIR", install_tmp_dir))
-    ops.exportEnv(ops.setEnv("PKG_CONFIG_LIBDIR", ops.path_join(iopc.getSdkPath(), "pkgconfig")))
-    ops.exportEnv(ops.setEnv("PKG_CONFIG_SYSROOT_DIR", iopc.getSdkPath()))
+    #ops.exportEnv(ops.setEnv("PKG_CONFIG_LIBDIR", ops.path_join(iopc.getSdkPath(), "pkgconfig")))
+    #ops.exportEnv(ops.setEnv("PKG_CONFIG_SYSROOT_DIR", iopc.getSdkPath()))
 
     cc_sysroot = ops.getEnv("CC_SYSROOT")
     cflags = ""
@@ -64,9 +69,9 @@ def MAIN_ENV(args):
 
     libs = ""
     libs += " -lffi -lxml2 -lexpat -ldrm"
-    ops.exportEnv(ops.setEnv("LDFLAGS", ldflags))
-    ops.exportEnv(ops.setEnv("CFLAGS", cflags))
-    ops.exportEnv(ops.setEnv("LIBS", libs))
+    #ops.exportEnv(ops.setEnv("LDFLAGS", ldflags))
+    #ops.exportEnv(ops.setEnv("CFLAGS", cflags))
+    #ops.exportEnv(ops.setEnv("LIBS", libs))
 
     return False
 
@@ -105,21 +110,24 @@ def MAIN_CONFIGURE(args):
     extra_conf.append("--disable-va")
     extra_conf.append("--enable-egl")
     extra_conf.append("--enable-driglx-direct")
-    #extra_conf.append("--without-gallium-drivers")
-    #extra_conf.append("--disable-llvm")
-    extra_conf.append("-with-platforms=drm,wayland")
+    if iopc.is_selected_package(PKG_WAYLAND):
+        extra_conf.append("-with-platforms=drm,wayland")
+        extra_conf.append('WAYLAND_CLIENT_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
+        extra_conf.append('WAYLAND_CLIENT_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-client')
+        extra_conf.append('WAYLAND_SERVER_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
+        extra_conf.append('WAYLAND_SERVER_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-server')
+    else:
+        extra_conf.append("-with-platforms=drm,surfaceless")
     extra_conf.append("--with-gallium-drivers=svga,swrast")
     extra_conf.append("--enable-gbm") 
-    extra_conf.append("--disable-osmesa")
+    #extra_conf.append("--enable-osmesa")
+    extra_conf.append("--enable-gallium-osmesa")
     extra_conf.append("--without-vulkan-drivers")
     extra_conf.append("--with-dri-drivers=swrast")
     extra_conf.append("--enable-shared-glapi")
+    extra_conf.append("--enable-gallium-tests")
     extra_conf.append('ZLIB_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libz'))
     extra_conf.append('ZLIB_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lz')
-    extra_conf.append('WAYLAND_CLIENT_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
-    extra_conf.append('WAYLAND_CLIENT_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-client')
-    extra_conf.append('WAYLAND_SERVER_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
-    extra_conf.append('WAYLAND_SERVER_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-server')
     extra_conf.append('EXPAT_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat'))
     extra_conf.append('EXPAT_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lexpat')
     extra_conf.append('LIBDRM_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm') + ' -I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm/libdrm'))
@@ -165,17 +173,28 @@ def MAIN_BUILD(args):
     ops.ln(dst_lib_dir, libglapi, "libglapi.so.0")
     ops.ln(dst_lib_dir, libglapi, "libglapi.so")
 
-    libwayland = "libwayland-egl.so.1.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libwayland), dst_lib_dir)
-    ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so.1.0")
-    ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so.1")
-    ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so")
+    libosmesa = "libOSMesa.so.8.0.0"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libosmesa), dst_lib_dir)
+    ops.ln(dst_lib_dir, libosmesa, "libOSMesa.so.8.0")
+    ops.ln(dst_lib_dir, libosmesa, "libOSMesa.so.8")
+    ops.ln(dst_lib_dir, libosmesa, "libOSMesa.so")
+
+    if iopc.is_selected_package(PKG_WAYLAND):
+        libwayland = "libwayland-egl.so.1.0.0"
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libwayland), dst_lib_dir)
+        ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so.1.0")
+        ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so.1")
+        ops.ln(dst_lib_dir, libwayland, "libwayland-egl.so")
 
     ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/dri"), dst_usr_local_lib_dir)
 
     ops.mkdir(tmp_include_dir)
     ops.copyto(ops.path_join(install_tmp_dir, "usr/local/include/."), tmp_include_dir)
-    return False
+
+    ops.mkdir(dst_pkgconfig_dir)
+    ops.copyto(ops.path_join(src_pkgconfig_dir, '.'), dst_pkgconfig_dir)
+
+    return True
 
 def MAIN_INSTALL(args):
     set_global(args)
@@ -183,6 +202,7 @@ def MAIN_INSTALL(args):
     iopc.installBin(args["pkg_name"], ops.path_join(ops.path_join(install_dir, "lib"), "."), "lib")
     iopc.installBin(args["pkg_name"], ops.path_join(dst_usr_local_lib_dir, "."), "usr/local/lib")
     iopc.installBin(args["pkg_name"], ops.path_join(tmp_include_dir, "."), dst_include_dir)
+    iopc.installBin(args["pkg_name"], ops.path_join(dst_pkgconfig_dir, '.'), "pkgconfig")
 
     return False
 

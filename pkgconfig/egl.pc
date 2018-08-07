@@ -1,0 +1,12 @@
+prefix={{SDKSTAGE}}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/mesa
+
+Name: egl
+Description: Mesa EGL library
+Requires.private: 
+Version: 18.0.1
+Libs: -L${libdir} -lEGL
+Libs.private: 
+Cflags: -I${includedir}  -DMESA_EGL_NO_X11_HEADERS

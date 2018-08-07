@@ -1,0 +1,11 @@
+prefix={{SDKSTAGE}}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/mesa
+dridriverdir=${libdir}/dri
+
+Name: dri
+Description: Direct Rendering Infrastructure
+Version: 18.0.1
+Requires.private: libdrm >= 2.4.75
+Cflags: -I${includedir}
