@@ -56,23 +56,6 @@ def MAIN_ENV(args):
     #ops.exportEnv(ops.setEnv("PKG_CONFIG_LIBDIR", ops.path_join(iopc.getSdkPath(), "pkgconfig")))
     #ops.exportEnv(ops.setEnv("PKG_CONFIG_SYSROOT_DIR", iopc.getSdkPath()))
 
-    cc_sysroot = ops.getEnv("CC_SYSROOT")
-    cflags = ""
-    cflags += " -I" + ops.path_join(cc_sysroot, 'usr/include')
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm')
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm/libdrm')
-
-    ldflags = ""
-    ldflags += " -L" + ops.path_join(cc_sysroot, 'lib')
-    ldflags += " -L" + ops.path_join(cc_sysroot, 'usr/lib')
-    ldflags += " -L" + ops.path_join(iopc.getSdkPath(), 'lib')
-
-    libs = ""
-    libs += " -lffi -lxml2 -lexpat -ldrm"
-    #ops.exportEnv(ops.setEnv("LDFLAGS", ldflags))
-    #ops.exportEnv(ops.setEnv("CFLAGS", cflags))
-    #ops.exportEnv(ops.setEnv("LIBS", libs))
-
     return False
 
 def MAIN_EXTRACT(args):
@@ -96,6 +79,9 @@ def MAIN_PATCH(args, patch_group_name):
 def MAIN_CONFIGURE(args):
     set_global(args)
 
+    cflags = iopc.get_includes()
+    libs = iopc.get_libs()
+
     extra_conf = []
     extra_conf.append("--host=" + cc_host)
     extra_conf.append("--disable-selinux")
@@ -110,28 +96,39 @@ def MAIN_CONFIGURE(args):
     extra_conf.append("--disable-va")
     extra_conf.append("--enable-egl")
     extra_conf.append("--enable-driglx-direct")
+    extra_conf.append("--enable-glx-tls")
+    extra_conf.append("--enable-texture-float")
     if iopc.is_selected_package(PKG_WAYLAND):
         extra_conf.append("-with-platforms=drm,wayland")
-        extra_conf.append('WAYLAND_CLIENT_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
-        extra_conf.append('WAYLAND_CLIENT_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-client')
-        extra_conf.append('WAYLAND_SERVER_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/wayland'))
-        extra_conf.append('WAYLAND_SERVER_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lwayland-server')
+        extra_conf.append('WAYLAND_CLIENT_CFLAGS=' + cflags)
+        extra_conf.append('WAYLAND_CLIENT_LIBS=' + libs)
+        extra_conf.append('WAYLAND_SERVER_CFLAGS=' + cflags)
+        extra_conf.append('WAYLAND_SERVER_LIBS=' + libs)
     else:
         extra_conf.append("-with-platforms=drm,surfaceless")
     extra_conf.append("--with-gallium-drivers=svga,swrast")
+    #extra_conf.append("--with-gallium-drivers=nouveau,swrast,radeonsi")
     extra_conf.append("--enable-gbm") 
     #extra_conf.append("--enable-osmesa")
     extra_conf.append("--enable-gallium-osmesa")
     extra_conf.append("--without-vulkan-drivers")
-    extra_conf.append("--with-dri-drivers=swrast")
+    #extra_conf.append("--with-dri-drivers=swrast")
+    extra_conf.append("--with-dri-drivers=swrast,i915,i965,nouveau")
     extra_conf.append("--enable-shared-glapi")
     extra_conf.append("--enable-gallium-tests")
-    extra_conf.append('ZLIB_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libz'))
-    extra_conf.append('ZLIB_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lz')
-    extra_conf.append('EXPAT_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat'))
-    extra_conf.append('EXPAT_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lexpat')
-    extra_conf.append('LIBDRM_CFLAGS=-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm') + ' -I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libdrm/libdrm'))
-    extra_conf.append('LIBDRM_LIBS=-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -ldrm')
+
+    extra_conf.append('ZLIB_CFLAGS=' + cflags)
+    extra_conf.append('ZLIB_LIBS=' + libs)
+    extra_conf.append('EXPAT_CFLAGS=' + cflags)
+    extra_conf.append('EXPAT_LIBS=' + libs)
+    extra_conf.append('LIBDRM_CFLAGS=' + cflags)
+    extra_conf.append('LIBDRM_LIBS=' + libs)
+    extra_conf.append('I915_CFLAGS=' + cflags)
+    extra_conf.append('I915_LIBS=' + libs)
+    extra_conf.append('NOUVEAU_CFLAGS=' + cflags)
+    extra_conf.append('NOUVEAU_LIBS=' + libs)
+    extra_conf.append('NVVIEUX_CFLAGS=' + cflags)
+    extra_conf.append('NVVIEUX_LIBS=' + libs)
 
     iopc.configure(tarball_dir, extra_conf)
 
@@ -140,7 +137,6 @@ def MAIN_CONFIGURE(args):
 def MAIN_BUILD(args):
     set_global(args)
 
-    print "Test " + ops.getEnv("PATH")
     ops.mkdir(install_dir)
     ops.mkdir(install_tmp_dir)
     iopc.make(tarball_dir)
@@ -203,6 +199,20 @@ def MAIN_INSTALL(args):
     iopc.installBin(args["pkg_name"], ops.path_join(dst_usr_local_lib_dir, "."), "usr/local/lib")
     iopc.installBin(args["pkg_name"], ops.path_join(tmp_include_dir, "."), dst_include_dir)
     iopc.installBin(args["pkg_name"], ops.path_join(dst_pkgconfig_dir, '.'), "pkgconfig")
+
+    return False
+
+def MAIN_SDKENV(args):
+    set_global(args)
+
+    cflags = ""
+    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/' + args["pkg_name"])
+    cflags += " -DMESA_EGL_NO_X11_HEADERS"
+    iopc.add_includes(cflags)
+
+    libs = ""
+    libs += " -lEGL -lGLESv2 -lgbm -lglapi -lOSMesa -lwayland-egl"
+    iopc.add_libs(libs)
 
     return False
 
